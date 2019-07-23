@@ -11,10 +11,10 @@ contract BountyMainContract {
         _;
     }
     
-    modifier isBountyOwner(string memory _name, string memory detailsUrl) {
+    modifier isBountyOwner() {
         BountyOwners memory _bountyOwnerStored = _bountyOwnerDetails[msg.sender];
         
-        require(keccak256(abi.encodePacked(_bountyOwnerStored.name)) == keccak256(abi.encodePacked(_name)),"Name not correct");
+        require(_bountyOwnerStored.valid,"Bounty owner does not exist");
         _;
     }
     
@@ -31,7 +31,7 @@ contract BountyMainContract {
         string detailsUrl;
         uint upvote;
         uint downvote;
-        
+        bool valid;
     }
     
     struct Bounty{
@@ -52,13 +52,14 @@ contract BountyMainContract {
         _bountyOwner.detailsUrl = _detailsUrl;
         _bountyOwner.upvote = 0;
         _bountyOwner.downvote = 0;
+        _bountyOwner.valid = true;
         
         _bountyOwnerDetails[msg.sender] = _bountyOwner;
         
     }
     
     
-    function addBounty(string calldata _name, string calldata _detailsUrl) external returns (bytes32){
+    function addBounty(string calldata _name, string calldata _detailsUrl) external isBountyOwner returns (bytes32){
         bytes32 _bountyId = keccak256(abi.encodePacked(_name,_detailsUrl));
         
       

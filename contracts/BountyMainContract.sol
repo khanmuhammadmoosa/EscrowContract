@@ -7,15 +7,19 @@ import "./BountyEscrowContract.sol";
 contract BountyMainContract {
     
     event BountyPlaced(address bountyOwner, bytes32 bountyHash);
+    event EscrowCreated(address escrowAddress);
     
     address payable _owner;
+    
     uint _fixedSecurityDeposit = 0.1 ether;
     BountyEscrowContract _bountyEscrowContract;
     
     modifier onlyOwner {
         require(msg.sender == _owner);
         _;
+        
     }
+    
     
     modifier isBountyOwner() {
         BountyOwners memory _bountyOwnerStored = _bountyOwnerDetails[msg.sender];
@@ -25,7 +29,15 @@ contract BountyMainContract {
     }
     
     
-    address[] _arbitrators;
+    modifier isNotBountyOwner(){
+         BountyOwners memory _bountyOwnerStored = _bountyOwnerDetails[msg.sender];
+        
+        require(!_bountyOwnerStored.valid,"Bounty owner cannot avail own bounty");
+        _;
+    }
+
+    
+    address payable _arbitrator = 0xdD870fA1b7C4700F2BD7f44238821C26f7392148;
     bytes32[] _bounties;
     
     mapping (address => mapping(bytes32=> Bounty)) _bountiesByOwnerAddress;
@@ -67,7 +79,7 @@ contract BountyMainContract {
     }
     
     
-    function addBounty(string calldata _name, string calldata _detailsUrl) external payable isBountyOwner returns (bytes32){
+    function addBounty(string calldata _name, string calldata _detailsUrl, uint _price) external payable isBountyOwner returns (bytes32){
         
         require(msg.value == _fixedSecurityDeposit,"Security Deposit must be made first");
         
@@ -77,7 +89,7 @@ contract BountyMainContract {
         
         currentBounties.name = _name;
         currentBounties.detailsUrl = _detailsUrl;
-        
+        currentBounties.price = _price;
         _bountiesDetailsById[_bountyId] = currentBounties;
         
         _bounties.push(_bountyId);
@@ -95,19 +107,21 @@ contract BountyMainContract {
     }
     
     
-    function addArbitrator(address _arbitratorAddress) external onlyOwner {
-        _arbitrators.push(_arbitratorAddress);
+    function addArbitrator(address  payable _arbitratorAddress) external onlyOwner {
+        //_arbitrators.push(_arbitratorAddress);
     }
     
-    function availBounty(bytes32 _bountyId) external payable returns(bool){
+    function availBounty(bytes32 _bountyId, address payable _bountyOwner) external isNotBountyOwner payable {
        Bounty storage _bountyToAvail = _bountiesDetailsById[_bountyId];
        require(_bountyToAvail.isAvailed == false,"Bounty already availed or doesn't exist");
-       require(_fixedSecurityDeposit == msg.value);
-       
+       require(_fixedSecurityDeposit == msg.value,"Security Deposit must be made first");
+      
        uint _arbitratorFee = 0.01 ether;
        
-       _bountyEscrowContract = (new BountyEscrowContract).value(msg.value)(address(0),msg.sender,_bountyId,_fixedSecurityDeposit * 2,address(0),_arbitratorFee);
+       _bountyEscrowContract = (new BountyEscrowContract).value(_fixedSecurityDeposit * 2)(_bountyOwner,msg.sender,_bountyId,_bountyToAvail.price,_arbitrator,_arbitratorFee);
        escrowAddressWithRespectToBountyHash[_bountyId] = msg.sender;
+       
+       emit EscrowCreated(address(_bountyEscrowContract));
        
         //To be continued
     }
